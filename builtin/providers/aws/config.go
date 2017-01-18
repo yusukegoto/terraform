@@ -46,7 +46,6 @@ import (
 	"github.com/aws/aws-sdk-go/service/firehose"
 	"github.com/aws/aws-sdk-go/service/glacier"
 	"github.com/aws/aws-sdk-go/service/iam"
-	"github.com/aws/aws-sdk-go/service/inspector"
 	"github.com/aws/aws-sdk-go/service/kinesis"
 	"github.com/aws/aws-sdk-go/service/kms"
 	"github.com/aws/aws-sdk-go/service/lambda"
@@ -64,6 +63,7 @@ import (
 	"github.com/aws/aws-sdk-go/service/ssm"
 	"github.com/aws/aws-sdk-go/service/sts"
 	"github.com/aws/aws-sdk-go/service/waf"
+	"github.com/aws/aws-sdk-go/service/wafregional"
 	"github.com/davecgh/go-spew/spew"
 	"github.com/hashicorp/errwrap"
 	"github.com/hashicorp/go-cleanhttp"
@@ -144,7 +144,6 @@ type AWSClient struct {
 	kinesisconn           *kinesis.Kinesis
 	kmsconn               *kms.KMS
 	firehoseconn          *firehose.Firehose
-	inspectorconn         *inspector.Inspector
 	elasticacheconn       *elasticache.ElastiCache
 	elasticbeanstalkconn  *elasticbeanstalk.ElasticBeanstalk
 	elastictranscoderconn *elastictranscoder.ElasticTranscoder
@@ -159,6 +158,7 @@ type AWSClient struct {
 	sfnconn               *sfn.SFN
 	ssmconn               *ssm.SSM
 	wafconn               *waf.WAF
+	wafregionalconn       *wafregional.WAFRegional
 }
 
 func (c *AWSClient) S3() *s3.S3 {
@@ -321,7 +321,6 @@ func (c *Config) Client() (interface{}, error) {
 	client.emrconn = emr.New(sess)
 	client.esconn = elasticsearch.New(sess)
 	client.firehoseconn = firehose.New(sess)
-	client.inspectorconn = inspector.New(sess)
 	client.glacierconn = glacier.New(sess)
 	client.kinesisconn = kinesis.New(kinesisSess)
 	client.kmsconn = kms.New(sess)
@@ -339,6 +338,7 @@ func (c *Config) Client() (interface{}, error) {
 	client.sqsconn = sqs.New(sess)
 	client.ssmconn = ssm.New(sess)
 	client.wafconn = waf.New(sess)
+	client.wafregionalconn = wafregional.New(sess)
 
 	return &client, nil
 }
