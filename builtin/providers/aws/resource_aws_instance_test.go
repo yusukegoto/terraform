@@ -5,6 +5,8 @@ import (
 	"reflect"
 	"testing"
 
+	"strings"
+
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/awserr"
 	"github.com/aws/aws-sdk-go/service/ec2"
@@ -846,6 +848,227 @@ func TestAccAWSInstance_changeInstanceType(t *testing.T) {
 	})
 }
 
+func TestAccAWSInstance_NetworkInterfacePrimary(t *testing.T) {
+	var instance ec2.Instance
+
+	testCheckEth0 := func() resource.TestCheckFunc {
+		expectedDesc := "testing default network interface"
+		expectedTerm := true
+		expectedAddrPrefix := "10.2.1"
+
+		return func(*terraform.State) error {
+			ifaces := make(map[int64]*ec2.InstanceNetworkInterface)
+			for _, iface := range instance.NetworkInterfaces {
+				ifaces[*iface.Attachment.DeviceIndex] = iface
+			}
+
+			result, ok := ifaces[int64(0)]
+			if !ok {
+				return fmt.Errorf("Network Interface %d does not exist at eth%d", 0, 0)
+			}
+
+			if *result.Description != expectedDesc {
+				return fmt.Errorf("Invalid Description. Expected: %s Got: %s", expectedDesc, *result.Description)
+			}
+
+			if *result.Attachment.DeleteOnTermination != expectedTerm {
+				return fmt.Errorf("Expected delete_on_termination to be %t. Got: %t", expectedTerm, *result.Attachment.DeleteOnTermination)
+			}
+
+			if !strings.Contains(*result.PrivateIpAddress, expectedAddrPrefix) {
+				return fmt.Errorf("Expected Private IP Address to contain %s, got: %s", expectedAddrPrefix, *result.PrivateIpAddress)
+			}
+
+			if result.NetworkInterfaceId == nil {
+				return fmt.Errorf("Expected network interface to not be nil")
+			}
+
+			return nil
+		}
+	}
+
+	resource.Test(t, resource.TestCase{
+		PreCheck:     func() { testAccPreCheck(t) },
+		Providers:    testAccProviders,
+		CheckDestroy: testAccCheckInstanceDestroy,
+		Steps: []resource.TestStep{
+			{
+				Config: testAccInstanceConfigNetworkInterface_default,
+				Check: resource.ComposeTestCheckFunc(
+					testAccCheckInstanceExists("aws_instance.foo", &instance),
+					testCheckEth0(),
+				),
+			},
+		},
+	})
+}
+
+func TestAccAWSInstance_NetworkInterfaceExisting(t *testing.T) {
+	var instance ec2.Instance
+
+	testCheckEth0 := func() resource.TestCheckFunc {
+		expectedDesc := "external network interface"
+		expectedTerm := false
+		expectedAddrPrefix := "10.3.2"
+
+		return func(*terraform.State) error {
+			ifaces := make(map[int64]*ec2.InstanceNetworkInterface)
+			for _, iface := range instance.NetworkInterfaces {
+				ifaces[*iface.Attachment.DeviceIndex] = iface
+			}
+
+			result, ok := ifaces[int64(0)]
+			if !ok {
+				return fmt.Errorf("Network Interface %d does not exist at eth%d", 0, 0)
+			}
+
+			if *result.Description != expectedDesc {
+				return fmt.Errorf("Invalid Description. Expected: %s Got: %s", expectedDesc, *result.Description)
+			}
+
+			if *result.Attachment.DeleteOnTermination != expectedTerm {
+				return fmt.Errorf("Expected delete_on_termination to be %t. Got: %t", expectedTerm, *result.Attachment.DeleteOnTermination)
+			}
+
+			if !strings.Contains(*result.PrivateIpAddress, expectedAddrPrefix) {
+				return fmt.Errorf("Expected Private IP Address to contain %s, got: %s", expectedAddrPrefix, *result.PrivateIpAddress)
+			}
+
+			if result.NetworkInterfaceId == nil {
+				return fmt.Errorf("Expected network interface to not be nil")
+			}
+
+			return nil
+		}
+	}
+
+	resource.Test(t, resource.TestCase{
+		PreCheck:     func() { testAccPreCheck(t) },
+		Providers:    testAccProviders,
+		CheckDestroy: testAccCheckInstanceDestroy,
+		Steps: []resource.TestStep{
+			{
+				Config: testAccInstanceConfigNetworkInterface_existing,
+				Check: resource.ComposeTestCheckFunc(
+					testAccCheckInstanceExists("aws_instance.foo", &instance),
+					testCheckEth0(),
+				),
+			},
+		},
+	})
+}
+
+func TestAccAWSInstance_NetworkInterfaceMultiple(t *testing.T) {
+	var instance ec2.Instance
+
+	testCheckEth0 := func() resource.TestCheckFunc {
+		expectedDesc := "external network interface"
+		expectedTerm := false
+		expectedAddrPrefix := "10.2.1"
+
+		return func(*terraform.State) error {
+			ifaces := make(map[int64]*ec2.InstanceNetworkInterface)
+			for _, iface := range instance.NetworkInterfaces {
+				ifaces[*iface.Attachment.DeviceIndex] = iface
+			}
+
+			result, ok := ifaces[int64(0)]
+			if !ok {
+				return fmt.Errorf("Network Interface %d does not exist at eth%d", 0, 0)
+			}
+
+			if *result.Description != expectedDesc {
+				return fmt.Errorf("Invalid Description. Expected: %s Got: %s", expectedDesc, *result.Description)
+			}
+
+			if *result.Attachment.DeleteOnTermination != expectedTerm {
+				return fmt.Errorf("Expected delete_on_termination to be %t. Got: %t", expectedTerm, *result.Attachment.DeleteOnTermination)
+			}
+
+			if !strings.Contains(*result.PrivateIpAddress, expectedAddrPrefix) {
+				return fmt.Errorf("Expected Private IP Address to contain %s, got: %s", expectedAddrPrefix, *result.PrivateIpAddress)
+			}
+
+			if result.NetworkInterfaceId == nil {
+				return fmt.Errorf("Expected network interface to not be nil")
+			}
+
+			return nil
+		}
+	}
+
+	testCheckEth1 := func() resource.TestCheckFunc {
+		expectedDesc := "testing eth1 network interface"
+		expectedTerm := true
+		expectedAddrPrefix := "10.2.1"
+
+		return func(*terraform.State) error {
+			ifaces := make(map[int64]*ec2.InstanceNetworkInterface)
+			for _, iface := range instance.NetworkInterfaces {
+				ifaces[*iface.Attachment.DeviceIndex] = iface
+			}
+
+			result, ok := ifaces[int64(1)]
+			if !ok {
+				return fmt.Errorf("Network Interface %d does not exist at eth%d", 1, 1)
+			}
+
+			if *result.Description != expectedDesc {
+				return fmt.Errorf("Invalid Description. Expected: %s Got: %s", expectedDesc, *result.Description)
+			}
+
+			if *result.Attachment.DeleteOnTermination != expectedTerm {
+				return fmt.Errorf("Expected delete_on_termination to be %t. Got: %t", expectedTerm, *result.Attachment.DeleteOnTermination)
+			}
+
+			if !strings.Contains(*result.PrivateIpAddress, expectedAddrPrefix) {
+				return fmt.Errorf("Expected Private IP Address to contain %s, got: %s", expectedAddrPrefix, *result.PrivateIpAddress)
+			}
+
+			if result.NetworkInterfaceId == nil {
+				return fmt.Errorf("Expected network interface to not be nil")
+			}
+
+			return nil
+		}
+	}
+
+	resource.Test(t, resource.TestCase{
+		PreCheck:     func() { testAccPreCheck(t) },
+		Providers:    testAccProviders,
+		CheckDestroy: testAccCheckInstanceDestroy,
+		Steps: []resource.TestStep{
+			{
+				Config: testAccInstanceConfigNetworkInterface_multiple,
+				Check: resource.ComposeTestCheckFunc(
+					testAccCheckInstanceExists("aws_instance.foo", &instance),
+					testCheckEth0(),
+					testCheckEth1(),
+				),
+			},
+		},
+	})
+}
+
+func TestAccAWSInstance_NetworkInterfaceSG(t *testing.T) {
+	var instance ec2.Instance
+	rInt := acctest.RandInt()
+
+	resource.Test(t, resource.TestCase{
+		PreCheck:     func() { testAccPreCheck(t) },
+		Providers:    testAccProviders,
+		CheckDestroy: testAccCheckInstanceDestroy,
+		Steps: []resource.TestStep{
+			{
+				Config: fmt.Sprintf(testAccInstanceConfigNetworkInterface_SecurityGroups, rInt),
+				Check: resource.ComposeTestCheckFunc(
+					testAccCheckInstanceExists("aws_instance.foo", &instance),
+				),
+			},
+		},
+	})
+}
+
 func testAccCheckInstanceNotRecreated(t *testing.T,
 	before, after *ec2.Instance) resource.TestCheckFunc {
 	return func(s *terraform.State) error {
@@ -1503,5 +1726,142 @@ resource "aws_instance" "foo" {
 	ami = "ami-22b9a343"
 	instance_type = "t2.micro"
 	subnet_id = "${aws_subnet.foo.id}"
+}
+`
+
+const testAccInstanceConfigNetworkInterface_default = `
+resource "aws_vpc" "foo" {
+  cidr_block = "10.2.0.0/16"
+}
+
+resource "aws_subnet" "foo" {
+  cidr_block = "10.2.1.0/24"
+  vpc_id = "${aws_vpc.foo.id}"
+}
+
+resource "aws_instance" "foo" {
+  ami = "ami-22b9a343"
+  instance_type = "t2.micro"
+  network_interface {
+    device_index = 0
+    description = "testing default network interface"
+    subnet_id = "${aws_subnet.foo.id}"
+  }
+  tags {
+    Name = "tf-testing-foo-network-interface"
+  }
+}
+`
+
+const testAccInstanceConfigNetworkInterface_existing = `
+resource "aws_vpc" "foo" {
+  cidr_block = "10.3.0.0/16"
+}
+
+resource "aws_subnet" "foo" {
+  cidr_block = "10.3.2.0/24"
+  vpc_id = "${aws_vpc.foo.id}"
+}
+
+resource "aws_network_interface" "bar" {
+  subnet_id = "${aws_subnet.foo.id}"
+  description = "external network interface"
+}
+
+resource "aws_instance" "foo" {
+  ami = "ami-22b9a343"
+  instance_type = "t2.micro"
+  network_interface {
+    device_index = 0
+    interface_id = "${aws_network_interface.bar.id}"
+    delete_on_termination = false
+  }
+  tags {
+    Name = "tf-testing-network-interface"
+  }
+}
+`
+
+const testAccInstanceConfigNetworkInterface_multiple = `
+resource "aws_vpc" "foo" {
+  cidr_block = "10.2.0.0/16"
+}
+
+resource "aws_subnet" "foo" {
+  cidr_block = "10.2.1.0/24"
+  vpc_id = "${aws_vpc.foo.id}"
+}
+
+resource "aws_network_interface" "foo" {
+  subnet_id = "${aws_subnet.foo.id}"
+  description = "external network interface"
+}
+
+resource "aws_instance" "foo" {
+  ami = "ami-22b9a343"
+  instance_type = "t2.micro"
+
+  network_interface {
+    device_index = 0
+    interface_id = "${aws_network_interface.foo.id}"
+    delete_on_termination = false
+  }
+
+  network_interface {
+    device_index = 1
+    description = "testing eth1 network interface"
+    subnet_id = "${aws_subnet.foo.id}"
+  }
+  
+  tags {
+    Name = "tf-testing-foo-network-interface"
+  }
+}
+`
+
+const testAccInstanceConfigNetworkInterface_SecurityGroups = `
+resource "aws_vpc" "foo" {
+  cidr_block = "10.3.0.0/16"
+}
+
+resource "aws_subnet" "foo" {
+  cidr_block = "10.3.1.0/24"
+  vpc_id = "${aws_vpc.foo.id}"
+}
+
+resource "aws_security_group" "foo" {
+  name        = "tf-testing-%d"
+  description = "Allow all inbound traffic"
+  vpc_id = "${aws_vpc.foo.id}"
+
+  ingress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["10.3.1.0/24"]
+  }
+
+  egress {
+    from_port       = 0
+    to_port         = 0
+    protocol        = "-1"
+    cidr_blocks     = ["10.3.1.0/24"]
+  }
+}
+
+resource "aws_instance" "foo" {
+  ami = "ami-22b9a343"
+  instance_type = "t2.micro"
+
+  network_interface {
+    device_index = 0
+    description = "testing network interface sgs"
+    subnet_id = "${aws_subnet.foo.id}"
+    security_groups = ["${aws_security_group.foo.id}"]
+  }
+
+  tags {
+    Name = "tf-testing-foo-network-interface"
+  }
 }
 `

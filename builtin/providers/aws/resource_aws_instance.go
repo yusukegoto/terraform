@@ -133,6 +133,71 @@ func resourceAwsInstance() *schema.Resource {
 				Computed: true,
 			},
 
+			"network_interface": {
+				Type:          schema.TypeSet,
+				Optional:      true,
+				Computed:      true,
+				ConflictsWith: []string{"associate_public_ip_address", "subnet_id", "private_ip", "vpc_security_group_ids", "security_groups", "ipv6_addresses", "ipv6_address_count"},
+				Elem: &schema.Resource{
+					Schema: map[string]*schema.Schema{
+						"interface_id": {
+							Type:     schema.TypeString,
+							Computed: true,
+							Optional: true,
+						},
+
+						"device_index": {
+							Type:     schema.TypeInt,
+							Required: true,
+						},
+
+						"delete_on_termination": {
+							Type:     schema.TypeBool,
+							Optional: true,
+							Default:  true,
+						},
+
+						"description": {
+							Type:     schema.TypeString,
+							Optional: true,
+						},
+
+						"security_groups": {
+							Type:     schema.TypeList,
+							Optional: true,
+							Computed: true,
+							Elem:     &schema.Schema{Type: schema.TypeString},
+						},
+
+						"ipv6_address_count": {
+							Type:     schema.TypeInt,
+							Optional: true,
+						},
+
+						"private_ip_address": {
+							Type:     schema.TypeString,
+							Optional: true,
+						},
+
+						"subnet_id": {
+							Type:     schema.TypeString,
+							Optional: true,
+						},
+
+						"attachment_id": {
+							Type:     schema.TypeString,
+							Computed: true,
+						},
+					},
+				},
+				Set: func(v interface{}) int {
+					var buf bytes.Buffer
+					m := v.(map[string]interface{})
+					buf.WriteString(fmt.Sprintf("%d-", m["device_index"].(int)))
+					return hashcode.String(buf.String())
+				},
+			},
+
 			"public_ip": {
 				Type:     schema.TypeString,
 				Computed: true,
@@ -528,27 +593,8 @@ func resourceAwsInstanceRead(d *schema.ResourceData, meta interface{}) error {
 	d.Set("private_ip", instance.PrivateIpAddress)
 	d.Set("iam_instance_profile", iamInstanceProfileArnToName(instance.IamInstanceProfile))
 
-	var ipv6Addresses []string
-	if len(instance.NetworkInterfaces) > 0 {
-		for _, ni := range instance.NetworkInterfaces {
-			if *ni.Attachment.DeviceIndex == 0 {
-				d.Set("subnet_id", ni.SubnetId)
-				d.Set("network_interface_id", ni.NetworkInterfaceId)
-				d.Set("associate_public_ip_address", ni.Association != nil)
-				d.Set("ipv6_address_count", len(ni.Ipv6Addresses))
-
-				for _, address := range ni.Ipv6Addresses {
-					ipv6Addresses = append(ipv6Addresses, *address.Ipv6Address)
-				}
-			}
-		}
-	} else {
-		d.Set("subnet_id", instance.SubnetId)
-		d.Set("network_interface_id", "")
-	}
-
-	if err := d.Set("ipv6_addresses", ipv6Addresses); err != nil {
-		log.Printf("[WARN] Error setting ipv6_addresses for AWS Instance (%s): %s", d.Id(), err)
+	if err := readNetworkInterfaces(d, instance); err != nil {
+		return err
 	}
 
 	d.Set("ebs_optimized", instance.EbsOptimized)
@@ -614,7 +660,7 @@ func resourceAwsInstanceUpdate(d *schema.ResourceData, meta interface{}) error {
 	if d.HasChange("iam_instance_profile") {
 		request := &ec2.DescribeIamInstanceProfileAssociationsInput{
 			Filters: []*ec2.Filter{
-				&ec2.Filter{
+				{
 					Name:   aws.String("instance-id"),
 					Values: []*string{aws.String(d.Id())},
 				},
@@ -683,12 +729,18 @@ func resourceAwsInstanceUpdate(d *schema.ResourceData, meta interface{}) error {
 		})
 		if err != nil {
 			if ec2err, ok := err.(awserr.Error); ok {
-				// Toloerate InvalidParameterCombination error in Classic, otherwise
-				// return the error
-				if "InvalidParameterCombination" != ec2err.Code() {
+				if "InvalidInstanceID" == ec2err.Code() {
+					// Modifying source_dest_check will fail with "InvalidInstanceID if the default
+					// network interface is changed.
+					// Catch the error and ignore it.
+					log.Printf("[WARN] Attempted to modify SourceDestCheck on an instance with multiple interfaces: %s", ec2err.Message())
+				} else if "InvalidParameterCombination" == ec2err.Code() {
+					// Toloerate InvalidParameterCombination error in Classic, otherwise
+					// return the error
+					log.Printf("[WARN] Attempted to modify SourceDestCheck on non VPC instance: %s", ec2err.Message())
+				} else {
 					return err
 				}
-				log.Printf("[WARN] Attempted to modify SourceDestCheck on non VPC instance: %s", ec2err.Message())
 			}
 		}
 	}
@@ -1260,6 +1312,15 @@ func buildAwsInstanceOpts(
 		}
 	}
 
+	networkInterfaces, err := readNetworkInterfacesFromConfig(d)
+	if err != nil {
+		return nil, err
+	}
+	if len(networkInterfaces) > 0 {
+		opts.NetworkInterfaces = networkInterfaces
+	}
+
+	// Cannot be set if manual `NetworkInterfaces` is set via `ConfictsWith`
 	if hasSubnet && associatePublicIPAddress {
 		// If we have a non-default VPC / Subnet specified, we can flag
 		// AssociatePublicIpAddress to get a Public IP assigned. By default these are not provided.
@@ -1268,6 +1329,10 @@ func buildAwsInstanceOpts(
 		// You also need to attach Security Groups to the NetworkInterface instead of the instance,
 		// to avoid: Network interfaces and an instance-level security groups may not be specified on
 		// the same request
+		// Public IP Addresss can only be assigned to interface eth0, and can only be assigned
+		// via a new network interface. If specifying a public, address, only one interface
+		// can be specified in the request. Thus, associate_public_ip_address directly conflicts
+		// with manually specifying network interfaces.
 		ni := &ec2.InstanceNetworkInterfaceSpecification{
 			AssociatePublicIpAddress: aws.Bool(associatePublicIPAddress),
 			DeviceIndex:              aws.Int64(int64(0)),
@@ -1286,7 +1351,8 @@ func buildAwsInstanceOpts(
 		}
 
 		opts.NetworkInterfaces = []*ec2.InstanceNetworkInterfaceSpecification{ni}
-	} else {
+		// Network Interfaces must be length 0 at this point, but check anyways
+	} else if len(networkInterfaces) == 0 {
 		if subnetID != "" {
 			opts.SubnetID = aws.String(subnetID)
 		}
@@ -1371,4 +1437,148 @@ func userDataHashSum(user_data string) string {
 
 	hash := sha1.Sum(v)
 	return hex.EncodeToString(hash[:])
+}
+
+func readNetworkInterfacesFromConfig(d *schema.ResourceData) ([]*ec2.InstanceNetworkInterfaceSpecification, error) {
+	networkInterfaces := make([]*ec2.InstanceNetworkInterfaceSpecification, 0)
+
+	if v, ok := d.GetOk("network_interface"); ok {
+		vL := v.(*schema.Set).List()
+		for _, v := range vL {
+			ni := v.(map[string]interface{})
+			iface := &ec2.InstanceNetworkInterfaceSpecification{
+				DeleteOnTermination: aws.Bool(ni["delete_on_termination"].(bool)),
+				DeviceIndex:         aws.Int64(int64(ni["device_index"].(int))),
+			}
+
+			if v, ok := ni["description"].(string); ok && v != "" {
+				iface.Description = aws.String(v)
+			}
+
+			if v, ok := ni["ipv6_address_count"].(int); ok && v != 0 {
+				iface.Ipv6AddressCount = aws.Int64(int64(v))
+			}
+
+			if v, ok := ni["private_ip_address"].(string); ok && v != "" {
+				iface.PrivateIpAddress = aws.String(v)
+			}
+
+			if v, ok := ni["subnet_id"].(string); ok && v != "" {
+				iface.SubnetId = aws.String(v)
+			}
+
+			if v, ok := ni["interface_id"].(string); ok && v != "" {
+				iface.NetworkInterfaceId = aws.String(v)
+			}
+
+			groups := []*string{}
+			if v, ok := ni["security_groups"]; ok && v != nil {
+				for _, sg := range v.([]interface{}) {
+					groups = append(groups, aws.String(sg.(string)))
+				}
+				if len(groups) > 0 {
+					iface.Groups = groups
+				}
+			}
+
+			networkInterfaces = append(networkInterfaces, iface)
+		}
+	}
+	return networkInterfaces, nil
+}
+
+func readNetworkInterfaces(d *schema.ResourceData, instance *ec2.Instance) error {
+	// If raw network interfaces are used, populate those, otherwise it's business as usual
+	if _, ok := d.GetOk("network_interface"); ok {
+		return readManualNetworkInterfaces(d, instance)
+	} else {
+		// Handles import case, defaults to empty
+		if err := d.Set("network_interface", nil); err != nil {
+			return err
+		}
+	}
+
+	var ipv6Addresses []string
+	if len(instance.NetworkInterfaces) > 0 {
+		for _, ni := range instance.NetworkInterfaces {
+			if *ni.Attachment.DeviceIndex == 0 {
+				d.Set("subnet_id", ni.SubnetId)
+				d.Set("network_interface_id", ni.NetworkInterfaceId)
+				d.Set("associate_public_ip_address", ni.Association != nil)
+				d.Set("ipv6_address_count", len(ni.Ipv6Addresses))
+
+				for _, address := range ni.Ipv6Addresses {
+					ipv6Addresses = append(ipv6Addresses, *address.Ipv6Address)
+				}
+			}
+		}
+	} else {
+		d.Set("subnet_id", instance.SubnetId)
+		d.Set("network_interface_id", "")
+	}
+
+	if err := d.Set("ipv6_addresses", ipv6Addresses); err != nil {
+		log.Printf("[WARN] Error setting ipv6_addresses for AWS Instance (%s): %s", d.Id(), err)
+	}
+	return nil
+}
+
+func readManualNetworkInterfaces(d *schema.ResourceData, instance *ec2.Instance) error {
+	networkInterfaces := make([]map[string]interface{}, 0)
+	var ipv6Addresses []string
+
+	for _, iNi := range instance.NetworkInterfaces {
+		ni := make(map[string]interface{})
+
+		if iNi.Description != nil {
+			ni["description"] = *iNi.Description
+		}
+
+		if iNi.Attachment.DeviceIndex != nil {
+			ni["device_index"] = *iNi.Attachment.DeviceIndex
+		}
+
+		if iNi.Attachment.DeleteOnTermination != nil {
+			ni["delete_on_termination"] = *iNi.Attachment.DeleteOnTermination
+		}
+
+		if len(iNi.Ipv6Addresses) != 0 {
+			ni["ipv6_address_count"] = len(iNi.Ipv6Addresses)
+		}
+
+		if iNi.SubnetId != nil {
+			ni["subnet_id"] = *iNi.SubnetId
+		}
+
+		if iNi.NetworkInterfaceId != nil {
+			ni["interface_id"] = *iNi.NetworkInterfaceId
+		}
+
+		if iNi.PrivateIpAddress != nil {
+			ni["private_ip_address"] = *iNi.PrivateIpAddress
+		}
+
+		if iNi.Attachment.AttachmentId != nil {
+			ni["attachment_id"] = *iNi.Attachment.AttachmentId
+		}
+
+		sgs := make([]string, 0, len(iNi.Groups))
+		for _, sg := range iNi.Groups {
+			sgs = append(sgs, *sg.GroupName)
+		}
+		ni["security_groups"] = sgs
+
+		networkInterfaces = append(networkInterfaces, ni)
+	}
+
+	if err := d.Set("network_interface", networkInterfaces); err != nil {
+		return err
+	}
+
+	// Set ipv6_addresses to nil
+	if err := d.Set("ipv6_addresses", ipv6Addresses); err != nil {
+		return err
+	}
+
+	return nil
 }

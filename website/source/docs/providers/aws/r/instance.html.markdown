@@ -86,6 +86,8 @@ instances. See [Shutdown Behavior](https://docs.aws.amazon.com/AWSEC2/latest/Use
   instance.  See [Block Devices](#block-devices) below for details.
 * `ephemeral_block_device` - (Optional) Customize Ephemeral (also known as
   "Instance Store") volumes on the instance. See [Block Devices](#block-devices) below for details.
+* `network_interface` - (Optional) Customize any network interfaces to be attached and/or created along with the instance.
+  See [Network Interfaces](#network-interfaces) below for more details.
 
 
 ## Block devices
@@ -148,6 +150,9 @@ identified by the `virtual_name` in the format `"ephemeral{0..N}"`.
 resources cannot be automatically detected by Terraform. After making updates
 to block device configuration, resource recreation can be manually triggered by
 using the [`taint` command](/docs/commands/taint.html).
+
+## Network Interfaces
+
 
 ## Attributes Reference
 
