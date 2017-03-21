@@ -153,6 +153,19 @@ using the [`taint` command](/docs/commands/taint.html).
 
 ## Network Interfaces
 
+Each `network_interface` attribute controls a single network interface attached to the instance.
+Note: At least one of `subnet_id` or `interface_id` must be specified.
+
+Each `network_interface` supports the following attributes:
+
+* `device_index` - (Required) The device index of the network interface, specified as an integer.
+* `interface_id` - (Optional) The network interface ID to attach to the instance. If unspecified, a network interface will be created.
+* `delete_on_termination` - (Optional) Boolean on whether or not the network interface created with the instance will be deleted upon instance termination. Defaults to `true`
+* `description` - (Optional) Description of the network interface to be created with the instance.
+* `security_groups` - (Optional) List of security groups to be associated with the network interface that will be created with the instance.
+* `ipv6_address_count` - (Optional) The number of IPv6 addresses to assign to the network interface. Amazon EC2 chooses the IPv6 addresses from the range of the subnet.
+* `private_ip_address` - (Optional) The private IP address to be used when creating a network interface. Cannot be set when using a pre-created network interface.
+* `subnet_id` - (Optional) Must be specified if `interface_id` is not specified. The subnet-id that EC2 will place the network interface in.
 
 ## Attributes Reference
 

@@ -177,6 +177,7 @@ func resourceAwsInstance() *schema.Resource {
 						"private_ip_address": {
 							Type:     schema.TypeString,
 							Optional: true,
+							Computed: true,
 						},
 
 						"subnet_id": {
@@ -1524,7 +1525,7 @@ func readNetworkInterfaces(d *schema.ResourceData, instance *ec2.Instance) error
 }
 
 func readManualNetworkInterfaces(d *schema.ResourceData, instance *ec2.Instance) error {
-	networkInterfaces := make([]map[string]interface{}, 0)
+	var networkInterfaces []map[string]interface{}
 	var ipv6Addresses []string
 
 	for _, iNi := range instance.NetworkInterfaces {
@@ -1564,7 +1565,7 @@ func readManualNetworkInterfaces(d *schema.ResourceData, instance *ec2.Instance)
 
 		sgs := make([]string, 0, len(iNi.Groups))
 		for _, sg := range iNi.Groups {
-			sgs = append(sgs, *sg.GroupName)
+			sgs = append(sgs, *sg.GroupId)
 		}
 		ni["security_groups"] = sgs
 
