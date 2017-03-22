@@ -180,6 +180,12 @@ func resourceAwsInstance() *schema.Resource {
 							Computed: true,
 						},
 
+						"private_ip_addresses": {
+							Type:     schema.TypeList,
+							Optional: true,
+							Elem:     &schema.Schema{Type: schema.TypeString},
+						},
+
 						"subnet_id": {
 							Type:     schema.TypeString,
 							Optional: true,
@@ -1482,6 +1488,16 @@ func readNetworkInterfacesFromConfig(d *schema.ResourceData) ([]*ec2.InstanceNet
 				}
 			}
 
+			privateAddrs := []interface{}{}
+			if v, ok := ni["private_ip_addresses"]; ok && v != nil {
+				for _, ip := range v.([]interface{}) {
+					privateAddrs = append(privateAddrs, ip.(string))
+				}
+				if len(privateAddrs) > 0 {
+					iface.PrivateIpAddresses = expandPrivateIPAddresses(privateAddrs)
+				}
+			}
+
 			networkInterfaces = append(networkInterfaces, iface)
 		}
 	}
@@ -1568,6 +1584,12 @@ func readManualNetworkInterfaces(d *schema.ResourceData, instance *ec2.Instance)
 			sgs = append(sgs, *sg.GroupId)
 		}
 		ni["security_groups"] = sgs
+
+		privateAddrs := make([]string, 0, len(iNi.PrivateIpAddresses))
+		for _, ip := range iNi.PrivateIpAddresses {
+			privateAddrs = append(privateAddrs, *ip.PrivateIpAddress)
+		}
+		ni["private_ip_addresses"] = privateAddrs
 
 		networkInterfaces = append(networkInterfaces, ni)
 	}

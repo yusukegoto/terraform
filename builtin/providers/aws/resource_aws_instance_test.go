@@ -1069,6 +1069,74 @@ func TestAccAWSInstance_NetworkInterfaceSG(t *testing.T) {
 	})
 }
 
+func TestAccAWSInstance_NetworkInterfacePrivateAddresses(t *testing.T) {
+	var instance ec2.Instance
+
+	testCheckEth0 := func() resource.TestCheckFunc {
+		expectedDesc := "testing default network interface"
+		expectedTerm := true
+		expectedAddrPrefix := "10.2.1"
+		expectedAddresses := []string{"10.2.1.10", "10.2.1.11"}
+
+		return func(*terraform.State) error {
+			ifaces := make(map[int64]*ec2.InstanceNetworkInterface)
+			for _, iface := range instance.NetworkInterfaces {
+				ifaces[*iface.Attachment.DeviceIndex] = iface
+			}
+
+			result, ok := ifaces[int64(0)]
+			if !ok {
+				return fmt.Errorf("Network Interface %d does not exist at eth%d", 0, 0)
+			}
+
+			if *result.Description != expectedDesc {
+				return fmt.Errorf("Invalid Description. Expected: %s Got: %s", expectedDesc, *result.Description)
+			}
+
+			if *result.Attachment.DeleteOnTermination != expectedTerm {
+				return fmt.Errorf("Expected delete_on_termination to be %t. Got: %t", expectedTerm, *result.Attachment.DeleteOnTermination)
+			}
+
+			if !strings.Contains(*result.PrivateIpAddress, expectedAddrPrefix) {
+				return fmt.Errorf("Expected Private IP Address to contain %s, got: %s", expectedAddrPrefix, *result.PrivateIpAddress)
+			}
+
+			if result.NetworkInterfaceId == nil {
+				return fmt.Errorf("Expected network interface to not be nil")
+			}
+
+			for _, ip := range expectedAddresses {
+				match := false
+				for _, resIP := range result.PrivateIpAddresses {
+					if *resIP.PrivateIpAddress == ip {
+						match = true
+					}
+				}
+				if !match {
+					return fmt.Errorf("Expected private ip address '%s', only found: %#v", ip, result.PrivateIpAddresses)
+				}
+			}
+
+			return nil
+		}
+	}
+
+	resource.Test(t, resource.TestCase{
+		PreCheck:     func() { testAccPreCheck(t) },
+		Providers:    testAccProviders,
+		CheckDestroy: testAccCheckInstanceDestroy,
+		Steps: []resource.TestStep{
+			{
+				Config: testAccInstanceConfigNetworkInterface_PrivateAddresses,
+				Check: resource.ComposeTestCheckFunc(
+					testAccCheckInstanceExists("aws_instance.foo", &instance),
+					testCheckEth0(),
+				),
+			},
+		},
+	})
+}
+
 func testAccCheckInstanceNotRecreated(t *testing.T,
 	before, after *ec2.Instance) resource.TestCheckFunc {
 	return func(s *terraform.State) error {
@@ -1860,6 +1928,31 @@ resource "aws_instance" "foo" {
     security_groups = ["${aws_security_group.foo.id}"]
   }
 
+  tags {
+    Name = "tf-testing-foo-network-interface"
+  }
+}
+`
+
+const testAccInstanceConfigNetworkInterface_PrivateAddresses = `
+resource "aws_vpc" "foo" {
+  cidr_block = "10.2.0.0/16"
+}
+
+resource "aws_subnet" "foo" {
+  cidr_block = "10.2.1.0/24"
+  vpc_id = "${aws_vpc.foo.id}"
+}
+
+resource "aws_instance" "foo" {
+  ami = "ami-22b9a343"
+  instance_type = "t2.micro"
+  network_interface {
+    device_index = 0
+    description = "testing default network interface"
+    subnet_id = "${aws_subnet.foo.id}"
+    private_ip_addresses = ["10.2.1.10", "10.2.1.11"]
+  }
   tags {
     Name = "tf-testing-foo-network-interface"
   }

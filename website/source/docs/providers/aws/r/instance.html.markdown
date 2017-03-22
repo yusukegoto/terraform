@@ -165,6 +165,7 @@ Each `network_interface` supports the following attributes:
 * `security_groups` - (Optional) List of security groups to be associated with the network interface that will be created with the instance.
 * `ipv6_address_count` - (Optional) The number of IPv6 addresses to assign to the network interface. Amazon EC2 chooses the IPv6 addresses from the range of the subnet.
 * `private_ip_address` - (Optional) The private IP address to be used when creating a network interface. Cannot be set when using a pre-created network interface.
+* `private_ip_addresses` - (Optional) A list of private IP addresses to be supplied to the created instance via the specified network interface.
 * `subnet_id` - (Optional) Must be specified if `interface_id` is not specified. The subnet-id that EC2 will place the network interface in.
 
 ## Attributes Reference
