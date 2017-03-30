@@ -174,7 +174,8 @@ func resourceArmServiceBusSubscriptionRead(d *schema.ResourceData, meta interfac
 	d.Set("resource_group_name", resGroup)
 	d.Set("namespace_name", namespaceName)
 	d.Set("topic_name", topicName)
-	d.Set("location", azureRMNormalizeLocation(*resp.Location))
+	// TODO: fix
+	//d.Set("location", azureRMNormalizeLocation(*resp.Location))
 
 	props := resp.SubscriptionProperties
 	d.Set("auto_delete_on_idle", props.AutoDeleteOnIdle)

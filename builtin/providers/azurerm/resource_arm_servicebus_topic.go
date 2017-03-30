@@ -182,7 +182,9 @@ func resourceArmServiceBusTopicRead(d *schema.ResourceData, meta interface{}) er
 	d.Set("name", resp.Name)
 	d.Set("resource_group_name", resGroup)
 	d.Set("namespace_name", namespaceName)
-	d.Set("location", azureRMNormalizeLocation(*resp.Location))
+
+	// TODO: fixme
+	//d.Set("location", azureRMNormalizeLocation(*resp.Location))
 
 	props := resp.TopicProperties
 	d.Set("auto_delete_on_idle", props.AutoDeleteOnIdle)

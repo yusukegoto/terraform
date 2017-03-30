@@ -67,13 +67,15 @@ func resourceArmEventHubConsumerGroupCreateUpdate(d *schema.ResourceData, meta i
 	name := d.Get("name").(string)
 	namespaceName := d.Get("namespace_name").(string)
 	eventHubName := d.Get("eventhub_name").(string)
-	location := d.Get("location").(string)
+	// TODO: Deprecate this
+	//location := d.Get("location").(string)
 	resGroup := d.Get("resource_group_name").(string)
 	userMetaData := d.Get("user_metadata").(string)
 
-	parameters := eventhub.ConsumerGroupCreateOrUpdateParameters{
-		Name:     &name,
-		Location: &location,
+	parameters := eventhub.ConsumerGroup{
+		Name: &name,
+		// TODO: Deprecate this
+		//Location: &location,
 		ConsumerGroupProperties: &eventhub.ConsumerGroupProperties{
 			UserMetadata: &userMetaData,
 		},
@@ -124,7 +126,8 @@ func resourceArmEventHubConsumerGroupRead(d *schema.ResourceData, meta interface
 	d.Set("eventhub_name", eventHubName)
 	d.Set("namespace_name", namespaceName)
 	d.Set("resource_group_name", resGroup)
-	d.Set("location", azureRMNormalizeLocation(*resp.Location))
+	// TODO: Deprecate this
+	//d.Set("location", azureRMNormalizeLocation(*resp.Location))
 	d.Set("user_metadata", resp.ConsumerGroupProperties.UserMetadata)
 
 	return nil
