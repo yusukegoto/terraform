@@ -66,19 +66,6 @@ const (
 	InstanceView InstanceViewTypes = "instanceView"
 )
 
-// OperatingSystemStateTypes enumerates the values for operating system state
-// types.
-type OperatingSystemStateTypes string
-
-const (
-	// Generalized specifies the generalized state for operating system state
-	// types.
-	Generalized OperatingSystemStateTypes = "Generalized"
-	// Specialized specifies the specialized state for operating system state
-	// types.
-	Specialized OperatingSystemStateTypes = "Specialized"
-)
-
 // OperatingSystemTypes enumerates the values for operating system types.
 type OperatingSystemTypes string
 
@@ -107,6 +94,15 @@ const (
 	HTTPS ProtocolTypes = "Https"
 )
 
+// ResourceIdentityType enumerates the values for resource identity type.
+type ResourceIdentityType string
+
+const (
+	// SystemAssigned specifies the system assigned state for resource identity
+	// type.
+	SystemAssigned ResourceIdentityType = "SystemAssigned"
+)
+
 // SettingNames enumerates the values for setting names.
 type SettingNames string
 
@@ -128,16 +124,6 @@ const (
 	Info StatusLevelTypes = "Info"
 	// Warning specifies the warning state for status level types.
 	Warning StatusLevelTypes = "Warning"
-)
-
-// StorageAccountTypes enumerates the values for storage account types.
-type StorageAccountTypes string
-
-const (
-	// PremiumLRS specifies the premium lrs state for storage account types.
-	PremiumLRS StorageAccountTypes = "Premium_LRS"
-	// StandardLRS specifies the standard lrs state for storage account types.
-	StandardLRS StorageAccountTypes = "Standard_LRS"
 )
 
 // UpgradeMode enumerates the values for upgrade mode.
@@ -397,7 +383,6 @@ type AvailabilitySet struct {
 	Location                   *string             `json:"location,omitempty"`
 	Tags                       *map[string]*string `json:"tags,omitempty"`
 	*AvailabilitySetProperties `json:"properties,omitempty"`
-	Sku                        *Sku `json:"sku,omitempty"`
 }
 
 // AvailabilitySetListResult is the List Availability Set operation response.
@@ -412,7 +397,6 @@ type AvailabilitySetProperties struct {
 	PlatformFaultDomainCount  *int32                `json:"platformFaultDomainCount,omitempty"`
 	VirtualMachines           *[]SubResource        `json:"virtualMachines,omitempty"`
 	Statuses                  *[]InstanceViewStatus `json:"statuses,omitempty"`
-	Managed                   *bool                 `json:"managed,omitempty"`
 }
 
 // BootDiagnostics is describes Boot Diagnostics.
@@ -430,14 +414,13 @@ type BootDiagnosticsInstanceView struct {
 
 // DataDisk is describes a data disk.
 type DataDisk struct {
-	Lun          *int32                 `json:"lun,omitempty"`
-	Name         *string                `json:"name,omitempty"`
-	Vhd          *VirtualHardDisk       `json:"vhd,omitempty"`
-	Image        *VirtualHardDisk       `json:"image,omitempty"`
-	Caching      CachingTypes           `json:"caching,omitempty"`
-	CreateOption DiskCreateOptionTypes  `json:"createOption,omitempty"`
-	DiskSizeGB   *int32                 `json:"diskSizeGB,omitempty"`
-	ManagedDisk  *ManagedDiskParameters `json:"managedDisk,omitempty"`
+	Lun          *int32                `json:"lun,omitempty"`
+	Name         *string               `json:"name,omitempty"`
+	Vhd          *VirtualHardDisk      `json:"vhd,omitempty"`
+	Image        *VirtualHardDisk      `json:"image,omitempty"`
+	Caching      CachingTypes          `json:"caching,omitempty"`
+	CreateOption DiskCreateOptionTypes `json:"createOption,omitempty"`
+	DiskSizeGB   *int32                `json:"diskSizeGB,omitempty"`
 }
 
 // DataDiskImage is contains the data disk images information.
@@ -468,77 +451,12 @@ type HardwareProfile struct {
 	VMSize VirtualMachineSizeTypes `json:"vmSize,omitempty"`
 }
 
-// Image is describes an Image.
-type Image struct {
-	autorest.Response `json:"-"`
-	ID                *string             `json:"id,omitempty"`
-	Name              *string             `json:"name,omitempty"`
-	Type              *string             `json:"type,omitempty"`
-	Location          *string             `json:"location,omitempty"`
-	Tags              *map[string]*string `json:"tags,omitempty"`
-	*ImageProperties  `json:"properties,omitempty"`
-}
-
-// ImageDataDisk is describes a data disk.
-type ImageDataDisk struct {
-	Lun         *int32       `json:"lun,omitempty"`
-	Snapshot    *SubResource `json:"snapshot,omitempty"`
-	ManagedDisk *SubResource `json:"managedDisk,omitempty"`
-	BlobURI     *string      `json:"blobUri,omitempty"`
-	Caching     CachingTypes `json:"caching,omitempty"`
-	DiskSizeGB  *int32       `json:"diskSizeGB,omitempty"`
-}
-
-// ImageListResult is the List Image operation response.
-type ImageListResult struct {
-	autorest.Response `json:"-"`
-	Value             *[]Image `json:"value,omitempty"`
-	NextLink          *string  `json:"nextLink,omitempty"`
-}
-
-// ImageListResultPreparer prepares a request to retrieve the next set of results. It returns
-// nil if no more results exist.
-func (client ImageListResult) ImageListResultPreparer() (*http.Request, error) {
-	if client.NextLink == nil || len(to.String(client.NextLink)) <= 0 {
-		return nil, nil
-	}
-	return autorest.Prepare(&http.Request{},
-		autorest.AsJSON(),
-		autorest.AsGet(),
-		autorest.WithBaseURL(to.String(client.NextLink)))
-}
-
-// ImageOSDisk is describes an Operating System disk.
-type ImageOSDisk struct {
-	OsType      OperatingSystemTypes      `json:"osType,omitempty"`
-	OsState     OperatingSystemStateTypes `json:"osState,omitempty"`
-	Snapshot    *SubResource              `json:"snapshot,omitempty"`
-	ManagedDisk *SubResource              `json:"managedDisk,omitempty"`
-	BlobURI     *string                   `json:"blobUri,omitempty"`
-	Caching     CachingTypes              `json:"caching,omitempty"`
-	DiskSizeGB  *int32                    `json:"diskSizeGB,omitempty"`
-}
-
-// ImageProperties is describes the properties of an Image.
-type ImageProperties struct {
-	SourceVirtualMachine *SubResource         `json:"sourceVirtualMachine,omitempty"`
-	StorageProfile       *ImageStorageProfile `json:"storageProfile,omitempty"`
-	ProvisioningState    *string              `json:"provisioningState,omitempty"`
-}
-
 // ImageReference is the image reference.
 type ImageReference struct {
-	ID        *string `json:"id,omitempty"`
 	Publisher *string `json:"publisher,omitempty"`
 	Offer     *string `json:"offer,omitempty"`
 	Sku       *string `json:"sku,omitempty"`
 	Version   *string `json:"version,omitempty"`
-}
-
-// ImageStorageProfile is describes a storage profile.
-type ImageStorageProfile struct {
-	OsDisk    *ImageOSDisk     `json:"osDisk,omitempty"`
-	DataDisks *[]ImageDataDisk `json:"dataDisks,omitempty"`
 }
 
 // InnerError is inner error details.
@@ -611,12 +529,6 @@ type LongRunningOperationProperties struct {
 	Output *map[string]interface{} `json:"output,omitempty"`
 }
 
-// ManagedDiskParameters is the parameters of a managed disk.
-type ManagedDiskParameters struct {
-	ID                 *string             `json:"id,omitempty"`
-	StorageAccountType StorageAccountTypes `json:"storageAccountType,omitempty"`
-}
-
 // NetworkInterfaceReference is describes a network interface reference.
 type NetworkInterfaceReference struct {
 	ID                                   *string `json:"id,omitempty"`
@@ -654,7 +566,6 @@ type OSDisk struct {
 	Caching            CachingTypes            `json:"caching,omitempty"`
 	CreateOption       DiskCreateOptionTypes   `json:"createOption,omitempty"`
 	DiskSizeGB         *int32                  `json:"diskSizeGB,omitempty"`
-	ManagedDisk        *ManagedDiskParameters  `json:"managedDisk,omitempty"`
 }
 
 // OSDiskImage is contains the os disk image information.
@@ -729,11 +640,6 @@ type SubResource struct {
 	ID *string `json:"id,omitempty"`
 }
 
-// SubResourceReadOnly is
-type SubResourceReadOnly struct {
-	ID *string `json:"id,omitempty"`
-}
-
 // UpgradePolicy is describes an upgrade policy - automatic or manual.
 type UpgradePolicy struct {
 	Mode UpgradeMode `json:"mode,omitempty"`
@@ -783,6 +689,7 @@ type VirtualMachine struct {
 	Plan                      *Plan               `json:"plan,omitempty"`
 	*VirtualMachineProperties `json:"properties,omitempty"`
 	Resources                 *[]VirtualMachineExtension `json:"resources,omitempty"`
+	Identity                  *VirtualMachineIdentity    `json:"identity,omitempty"`
 }
 
 // VirtualMachineAgentInstanceView is the instance view of the VM Agent running
@@ -877,6 +784,13 @@ type VirtualMachineExtensionProperties struct {
 	InstanceView            *VirtualMachineExtensionInstanceView `json:"instanceView,omitempty"`
 }
 
+// VirtualMachineIdentity is identity for the virtual machine.
+type VirtualMachineIdentity struct {
+	PrincipalID *string              `json:"principalId,omitempty"`
+	TenantID    *string              `json:"tenantId,omitempty"`
+	Type        ResourceIdentityType `json:"type,omitempty"`
+}
+
 // VirtualMachineImage is describes a Virtual Machine Image.
 type VirtualMachineImage struct {
 	autorest.Response              `json:"-"`
@@ -957,19 +871,8 @@ type VirtualMachineScaleSet struct {
 	Location                          *string             `json:"location,omitempty"`
 	Tags                              *map[string]*string `json:"tags,omitempty"`
 	Sku                               *Sku                `json:"sku,omitempty"`
-	Plan                              *Plan               `json:"plan,omitempty"`
 	*VirtualMachineScaleSetProperties `json:"properties,omitempty"`
-}
-
-// VirtualMachineScaleSetDataDisk is describes a virtual machine scale set data
-// disk.
-type VirtualMachineScaleSetDataDisk struct {
-	Name         *string                                      `json:"name,omitempty"`
-	Lun          *int32                                       `json:"lun,omitempty"`
-	Caching      CachingTypes                                 `json:"caching,omitempty"`
-	CreateOption DiskCreateOptionTypes                        `json:"createOption,omitempty"`
-	DiskSizeGB   *int32                                       `json:"diskSizeGB,omitempty"`
-	ManagedDisk  *VirtualMachineScaleSetManagedDiskParameters `json:"managedDisk,omitempty"`
+	Identity                          *VirtualMachineScaleSetIdentity `json:"identity,omitempty"`
 }
 
 // VirtualMachineScaleSetExtension is describes a Virtual Machine Scale Set
@@ -996,6 +899,14 @@ type VirtualMachineScaleSetExtensionProperties struct {
 	Settings                *map[string]interface{} `json:"settings,omitempty"`
 	ProtectedSettings       *map[string]interface{} `json:"protectedSettings,omitempty"`
 	ProvisioningState       *string                 `json:"provisioningState,omitempty"`
+}
+
+// VirtualMachineScaleSetIdentity is identity for the virtual machine scale
+// set.
+type VirtualMachineScaleSetIdentity struct {
+	PrincipalID *string              `json:"principalId,omitempty"`
+	TenantID    *string              `json:"tenantId,omitempty"`
+	Type        ResourceIdentityType `json:"type,omitempty"`
 }
 
 // VirtualMachineScaleSetInstanceView is the instance view of a virtual machine
@@ -1090,12 +1001,6 @@ func (client VirtualMachineScaleSetListWithLinkResult) VirtualMachineScaleSetLis
 		autorest.WithBaseURL(to.String(client.NextLink)))
 }
 
-// VirtualMachineScaleSetManagedDiskParameters is describes the parameters of a
-// ScaleSet managed disk.
-type VirtualMachineScaleSetManagedDiskParameters struct {
-	StorageAccountType StorageAccountTypes `json:"storageAccountType,omitempty"`
-}
-
 // VirtualMachineScaleSetNetworkConfiguration is describes a virtual machine
 // scale set network profile's network configurations.
 type VirtualMachineScaleSetNetworkConfiguration struct {
@@ -1120,13 +1025,12 @@ type VirtualMachineScaleSetNetworkProfile struct {
 // VirtualMachineScaleSetOSDisk is describes a virtual machine scale set
 // operating system disk.
 type VirtualMachineScaleSetOSDisk struct {
-	Name          *string                                      `json:"name,omitempty"`
-	Caching       CachingTypes                                 `json:"caching,omitempty"`
-	CreateOption  DiskCreateOptionTypes                        `json:"createOption,omitempty"`
-	OsType        OperatingSystemTypes                         `json:"osType,omitempty"`
-	Image         *VirtualHardDisk                             `json:"image,omitempty"`
-	VhdContainers *[]string                                    `json:"vhdContainers,omitempty"`
-	ManagedDisk   *VirtualMachineScaleSetManagedDiskParameters `json:"managedDisk,omitempty"`
+	Name          *string               `json:"name,omitempty"`
+	Caching       CachingTypes          `json:"caching,omitempty"`
+	CreateOption  DiskCreateOptionTypes `json:"createOption,omitempty"`
+	OsType        OperatingSystemTypes  `json:"osType,omitempty"`
+	Image         *VirtualHardDisk      `json:"image,omitempty"`
+	VhdContainers *[]string             `json:"vhdContainers,omitempty"`
 }
 
 // VirtualMachineScaleSetOSProfile is describes a virtual machine scale set OS
@@ -1148,7 +1052,6 @@ type VirtualMachineScaleSetProperties struct {
 	VirtualMachineProfile *VirtualMachineScaleSetVMProfile `json:"virtualMachineProfile,omitempty"`
 	ProvisioningState     *string                          `json:"provisioningState,omitempty"`
 	Overprovision         *bool                            `json:"overprovision,omitempty"`
-	SinglePlacementGroup  *bool                            `json:"singlePlacementGroup,omitempty"`
 }
 
 // VirtualMachineScaleSetSku is describes an available virtual machine scale
@@ -1170,9 +1073,8 @@ type VirtualMachineScaleSetSkuCapacity struct {
 // VirtualMachineScaleSetStorageProfile is describes a virtual machine scale
 // set storage profile.
 type VirtualMachineScaleSetStorageProfile struct {
-	ImageReference *ImageReference                   `json:"imageReference,omitempty"`
-	OsDisk         *VirtualMachineScaleSetOSDisk     `json:"osDisk,omitempty"`
-	DataDisks      *[]VirtualMachineScaleSetDataDisk `json:"dataDisks,omitempty"`
+	ImageReference *ImageReference               `json:"imageReference,omitempty"`
+	OsDisk         *VirtualMachineScaleSetOSDisk `json:"osDisk,omitempty"`
 }
 
 // VirtualMachineScaleSetVM is describes a virtual machine scale set virtual
@@ -1222,7 +1124,6 @@ type VirtualMachineScaleSetVMInstanceView struct {
 	Extensions           *[]VirtualMachineExtensionInstanceView `json:"extensions,omitempty"`
 	BootDiagnostics      *BootDiagnosticsInstanceView           `json:"bootDiagnostics,omitempty"`
 	Statuses             *[]InstanceViewStatus                  `json:"statuses,omitempty"`
-	PlacementGroupID     *string                                `json:"placementGroupId,omitempty"`
 }
 
 // VirtualMachineScaleSetVMListResult is the List Virtual Machine Scale Set VMs
